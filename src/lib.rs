@@ -45,13 +45,13 @@ pub mod utils;
 pub use client::{Client, ClientBuilder};
 pub use error::{Error, Result};
 pub use models::{
-    channel::Channel,
-    guild::Guild,
+    channel::{Channel, Invite},
+    guild::{Guild, GuildMember, Role, Ban},
     message::{Message, MessageBuilder},
     user::User,
     embed::Embed,
     presence::{Activity, Presence, CustomStatus, RichPresence, SpotifyRPC},
     poll::Poll,
 };
-pub use events::EventHandler;
+pub use events::{EventHandler, ReactionEvent};
 

@@ -156,3 +156,74 @@ impl Channel {
     }
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Invite {
+    pub code: String,
+    pub channel: Option<serde_json::Value>,
+    pub guild: Option<serde_json::Value>,
+    pub inviter: Option<crate::models::user::User>,
+    pub target_type: Option<u8>,
+    pub target_user: Option<crate::models::user::User>,
+    pub approximate_presence_count: Option<u32>,
+    pub approximate_member_count: Option<u32>,
+    pub expires_at: Option<String>,
+    pub uses: Option<u32>,
+    pub max_uses: Option<u32>,
+    pub max_age: Option<u32>,
+    pub temporary: Option<bool>,
+    pub created_at: Option<String>,
+}
+
+impl Channel {
+    /// Returns the channel name if available.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Channel::GuildText(c) => Some(&c.name),
+            Channel::GuildVoice(c) => Some(&c.name),
+            Channel::GuildCategory(c) => Some(&c.name),
+            Channel::GuildNews(c) => Some(&c.name),
+            Channel::GuildNewsThread(c) => Some(&c.name),
+            Channel::GuildPublicThread(c) => Some(&c.name),
+            Channel::GuildPrivateThread(c) => Some(&c.name),
+            Channel::GuildStageVoice(c) => Some(&c.name),
+            Channel::GuildForum(c) => Some(&c.name),
+            Channel::GroupDM(c) => c.name.as_deref(),
+            Channel::DM(_) => None,
+        }
+    }
+
+    /// Returns the guild ID if this channel belongs to a guild.
+    pub fn guild_id(&self) -> Option<Snowflake> {
+        match self {
+            Channel::GuildText(c) => c.guild_id,
+            Channel::GuildVoice(c) => c.guild_id,
+            Channel::GuildCategory(c) => c.guild_id,
+            Channel::GuildNews(c) => c.guild_id,
+            Channel::GuildNewsThread(c) => c.guild_id,
+            Channel::GuildPublicThread(c) => c.guild_id,
+            Channel::GuildPrivateThread(c) => c.guild_id,
+            Channel::GuildStageVoice(c) => c.guild_id,
+            Channel::GuildForum(c) => c.guild_id,
+            _ => None,
+        }
+    }
+
+    /// Returns true if this is a DM or group DM channel.
+    pub fn is_dm(&self) -> bool {
+        matches!(self, Channel::DM(_) | Channel::GroupDM(_))
+    }
+
+    /// Returns true if this is a thread channel.
+    pub fn is_thread(&self) -> bool {
+        matches!(
+            self,
+            Channel::GuildNewsThread(_) | Channel::GuildPublicThread(_) | Channel::GuildPrivateThread(_)
+        )
+    }
+
+    /// Returns the channel mention string.
+    pub fn mention(&self) -> String {
+        format!("<#{}>", self.id())
+    }
+}

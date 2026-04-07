@@ -219,8 +219,7 @@ impl Gateway {
     async fn handle_event(&self, event_type: &str, data: &serde_json::Value) -> Result<()> {
         debug!("Received event: {}", event_type);
 
-        // Call raw handler
-        self.event_handler.raw(data.clone()).await;
+        self.event_handler.on_raw_event(data.clone()).await;
 
         match event_type {
             "READY" => {
@@ -230,78 +229,268 @@ impl Gateway {
                         *session_lock = Some(session_id.to_string());
                     }
                     info!("Client is ready!");
-                    self.event_handler.ready(user).await;
+                    self.event_handler.on_ready(user).await;
                 }
             }
+            "RESUMED" => {
+                info!("Session resumed");
+                self.event_handler.on_resumed().await;
+            }
+
+            // ── Messages ──────────────────────────────────────────────────
             "MESSAGE_CREATE" => {
                 if let Ok(message) = serde_json::from_value(data.clone()) {
-                    self.event_handler.message_create(message).await;
+                    self.event_handler.on_message(message).await;
                 }
             }
             "MESSAGE_UPDATE" => {
                 if let Ok(new_message) = serde_json::from_value(data.clone()) {
-                    self.event_handler.message_update(None, new_message).await;
+                    self.event_handler.on_message_edit(None, new_message).await;
                 }
             }
             "MESSAGE_DELETE" => {
                 if let (Some(channel_id), Some(message_id)) = (
                     data["channel_id"].as_str(),
-                    data["id"].as_str()
+                    data["id"].as_str(),
                 ) {
-                    self.event_handler.message_delete(
-                        channel_id.into(),
-                        message_id.into()
-                    ).await;
+                    self.event_handler.on_message_delete(channel_id.into(), message_id.into()).await;
                 }
             }
+            "MESSAGE_DELETE_BULK" => {
+                if let Some(channel_id) = data["channel_id"].as_str() {
+                    let ids = data["ids"]
+                        .as_array()
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.into())).collect())
+                        .unwrap_or_default();
+                    self.event_handler.on_message_bulk_delete(channel_id.into(), ids).await;
+                }
+            }
+
+            // ── Reactions ─────────────────────────────────────────────────
+            "MESSAGE_REACTION_ADD" => {
+                if let (Some(user_id), Some(channel_id), Some(message_id)) = (
+                    data["user_id"].as_str(),
+                    data["channel_id"].as_str(),
+                    data["message_id"].as_str(),
+                ) {
+                    let emoji = data["emoji"]["name"].as_str().unwrap_or("").to_string();
+                    let guild_id = data["guild_id"].as_str().map(|s| s.into());
+                    self.event_handler.on_reaction_add(crate::events::ReactionEvent {
+                        user_id: user_id.into(),
+                        channel_id: channel_id.into(),
+                        message_id: message_id.into(),
+                        guild_id,
+                        emoji,
+                    }).await;
+                }
+            }
+            "MESSAGE_REACTION_REMOVE" => {
+                if let (Some(user_id), Some(channel_id), Some(message_id)) = (
+                    data["user_id"].as_str(),
+                    data["channel_id"].as_str(),
+                    data["message_id"].as_str(),
+                ) {
+                    let emoji = data["emoji"]["name"].as_str().unwrap_or("").to_string();
+                    let guild_id = data["guild_id"].as_str().map(|s| s.into());
+                    self.event_handler.on_reaction_remove(crate::events::ReactionEvent {
+                        user_id: user_id.into(),
+                        channel_id: channel_id.into(),
+                        message_id: message_id.into(),
+                        guild_id,
+                        emoji,
+                    }).await;
+                }
+            }
+            "MESSAGE_REACTION_REMOVE_ALL" => {
+                if let (Some(channel_id), Some(message_id)) = (
+                    data["channel_id"].as_str(),
+                    data["message_id"].as_str(),
+                ) {
+                    self.event_handler.on_reaction_clear(channel_id.into(), message_id.into()).await;
+                }
+            }
+            "MESSAGE_REACTION_REMOVE_EMOJI" => {
+                if let (Some(channel_id), Some(message_id)) = (
+                    data["channel_id"].as_str(),
+                    data["message_id"].as_str(),
+                ) {
+                    let emoji = data["emoji"]["name"].as_str().unwrap_or("").to_string();
+                    self.event_handler.on_reaction_clear_emoji(channel_id.into(), message_id.into(), emoji).await;
+                }
+            }
+
+            // ── Guilds ────────────────────────────────────────────────────
             "GUILD_CREATE" => {
                 if let Ok(guild) = serde_json::from_value(data.clone()) {
-                    self.event_handler.guild_create(guild).await;
+                    self.event_handler.on_guild_join(guild).await;
+                }
+            }
+            "GUILD_UPDATE" => {
+                if let Ok(guild) = serde_json::from_value(data.clone()) {
+                    self.event_handler.on_guild_update(None, guild).await;
                 }
             }
             "GUILD_DELETE" => {
                 if let Some(guild_id) = data["id"].as_str() {
-                    self.event_handler.guild_delete(guild_id.into()).await;
+                    if data["unavailable"].as_bool().unwrap_or(false) {
+                        self.event_handler.on_guild_unavailable(guild_id.into()).await;
+                    } else {
+                        self.event_handler.on_guild_leave(guild_id.into()).await;
+                    }
                 }
             }
+
+            // ── Members ───────────────────────────────────────────────────
+            "GUILD_MEMBER_ADD" => {
+                if let (Some(guild_id), Ok(member)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data.clone()),
+                ) {
+                    self.event_handler.on_member_join(guild_id.into(), member).await;
+                }
+            }
+            "GUILD_MEMBER_UPDATE" => {
+                if let (Some(guild_id), Ok(member)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data.clone()),
+                ) {
+                    self.event_handler.on_member_update(guild_id.into(), member).await;
+                }
+            }
+            "GUILD_MEMBER_REMOVE" => {
+                if let (Some(guild_id), Ok(user)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data["user"].clone()),
+                ) {
+                    self.event_handler.on_member_leave(guild_id.into(), user).await;
+                }
+            }
+
+            // ── Roles ─────────────────────────────────────────────────────
+            "GUILD_ROLE_CREATE" => {
+                if let (Some(guild_id), Ok(role)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data["role"].clone()),
+                ) {
+                    self.event_handler.on_role_create(guild_id.into(), role).await;
+                }
+            }
+            "GUILD_ROLE_UPDATE" => {
+                if let (Some(guild_id), Ok(role)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data["role"].clone()),
+                ) {
+                    self.event_handler.on_role_update(guild_id.into(), role).await;
+                }
+            }
+            "GUILD_ROLE_DELETE" => {
+                if let (Some(guild_id), Some(role_id)) = (
+                    data["guild_id"].as_str(),
+                    data["role_id"].as_str(),
+                ) {
+                    self.event_handler.on_role_delete(guild_id.into(), role_id.into()).await;
+                }
+            }
+
+            // ── Channels ──────────────────────────────────────────────────
             "CHANNEL_CREATE" => {
                 if let Ok(channel) = serde_json::from_value(data.clone()) {
-                    self.event_handler.channel_create(channel).await;
+                    self.event_handler.on_channel_create(channel).await;
+                }
+            }
+            "CHANNEL_UPDATE" => {
+                if let Ok(channel) = serde_json::from_value(data.clone()) {
+                    self.event_handler.on_channel_update(None, channel).await;
                 }
             }
             "CHANNEL_DELETE" => {
                 if let Ok(channel) = serde_json::from_value(data.clone()) {
-                    self.event_handler.channel_delete(channel).await;
+                    self.event_handler.on_channel_delete(channel).await;
                 }
             }
+            "CHANNEL_PINS_UPDATE" => {
+                if let Some(channel_id) = data["channel_id"].as_str() {
+                    let last_pin = data["last_pin_timestamp"].as_str().map(|s| s.to_string());
+                    self.event_handler.on_channel_pins_update(channel_id.into(), last_pin).await;
+                }
+            }
+
+            // ── Threads ───────────────────────────────────────────────────
+            "THREAD_CREATE" => {
+                if let Ok(channel) = serde_json::from_value(data.clone()) {
+                    self.event_handler.on_thread_create(channel).await;
+                }
+            }
+            "THREAD_UPDATE" => {
+                if let Ok(channel) = serde_json::from_value(data.clone()) {
+                    self.event_handler.on_thread_update(channel).await;
+                }
+            }
+            "THREAD_DELETE" => {
+                if let Some(channel_id) = data["id"].as_str() {
+                    let guild_id = data["guild_id"].as_str().map(|s| s.into());
+                    self.event_handler.on_thread_delete(channel_id.into(), guild_id).await;
+                }
+            }
+
+            // ── Invites ───────────────────────────────────────────────────
+            "INVITE_CREATE" => {
+                if let Ok(invite) = serde_json::from_value(data.clone()) {
+                    self.event_handler.on_invite_create(invite).await;
+                }
+            }
+            "INVITE_DELETE" => {
+                if let (Some(channel_id), Some(code)) = (
+                    data["channel_id"].as_str(),
+                    data["code"].as_str(),
+                ) {
+                    self.event_handler.on_invite_delete(channel_id.into(), code.to_string()).await;
+                }
+            }
+
+            // ── Bans ──────────────────────────────────────────────────────
+            "GUILD_BAN_ADD" => {
+                if let (Some(guild_id), Ok(user)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data["user"].clone()),
+                ) {
+                    self.event_handler.on_ban_add(guild_id.into(), user).await;
+                }
+            }
+            "GUILD_BAN_REMOVE" => {
+                if let (Some(guild_id), Ok(user)) = (
+                    data["guild_id"].as_str(),
+                    serde_json::from_value(data["user"].clone()),
+                ) {
+                    self.event_handler.on_ban_remove(guild_id.into(), user).await;
+                }
+            }
+
+            // ── Presence & Typing ─────────────────────────────────────────
             "PRESENCE_UPDATE" => {
                 if let Ok(presence) = serde_json::from_value(data.clone()) {
-                    self.event_handler.presence_update(presence).await;
+                    self.event_handler.on_presence_update(presence).await;
                 }
             }
             "TYPING_START" => {
                 if let (Some(channel_id), Some(user_id)) = (
                     data["channel_id"].as_str(),
-                    data["user_id"].as_str()
+                    data["user_id"].as_str(),
                 ) {
-                    self.event_handler.typing_start(
-                        channel_id.into(),
-                        user_id.into()
-                    ).await;
+                    self.event_handler.on_typing_start(channel_id.into(), user_id.into()).await;
                 }
             }
+
+            // ── Polls ─────────────────────────────────────────────────────
             "MESSAGE_POLL_VOTE_ADD" => {
                 if let (Some(user_id), Some(channel_id), Some(message_id), Some(answer_id)) = (
                     data["user_id"].as_str(),
                     data["channel_id"].as_str(),
                     data["message_id"].as_str(),
-                    data["answer_id"].as_u64()
+                    data["answer_id"].as_u64(),
                 ) {
-                    self.event_handler.poll_vote_add(
-                        user_id.into(),
-                        channel_id.into(),
-                        message_id.into(),
-                        answer_id as u32
+                    self.event_handler.on_poll_vote_add(
+                        user_id.into(), channel_id.into(), message_id.into(), answer_id as u32,
                     ).await;
                 }
             }
@@ -310,18 +499,23 @@ impl Gateway {
                     data["user_id"].as_str(),
                     data["channel_id"].as_str(),
                     data["message_id"].as_str(),
-                    data["answer_id"].as_u64()
+                    data["answer_id"].as_u64(),
                 ) {
-                    self.event_handler.poll_vote_remove(
-                        user_id.into(),
-                        channel_id.into(),
-                        message_id.into(),
-                        answer_id as u32
+                    self.event_handler.on_poll_vote_remove(
+                        user_id.into(), channel_id.into(), message_id.into(), answer_id as u32,
                     ).await;
                 }
             }
+
+            // ── Users ─────────────────────────────────────────────────────
+            "USER_UPDATE" => {
+                if let Ok(user) = serde_json::from_value(data.clone()) {
+                    self.event_handler.on_user_update(user).await;
+                }
+            }
+
             _ => {
-                debug!("Unhandled event type: {}", event_type);
+                debug!("Unhandled event: {}", event_type);
             }
         }
 

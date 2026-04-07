@@ -7,8 +7,8 @@ pub mod presence;
 pub mod poll;
 
 pub use user::User;
-pub use guild::Guild;
-pub use channel::Channel;
+pub use guild::{Guild, GuildMember, Role, Ban};
+pub use channel::{Channel, Invite};
 pub use message::Message;
 pub use embed::Embed;
 pub use presence::{Presence, Activity, CustomStatus, RichPresence, SpotifyRPC};
