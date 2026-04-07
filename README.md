@@ -19,7 +19,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-discord-authority = { git = "https://github.com/ege0x77czz/discord-authority" }
+discord-authority = { git = "https://github.com/trophal/discord-authority" }
 ```
 
 Or if working locally:
