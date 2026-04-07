@@ -1,4 +1,4 @@
-//! # authority
+//! # discord-authority
 //!
 //! A fast, async Discord selfbot library for Rust.
 //!
@@ -8,7 +8,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! use authority::{Client, ClientBuilder, EventHandler, User};
+//! use discord_authority::{Client, ClientBuilder, EventHandler, User};
 //! use std::sync::Arc;
 //! use async_trait::async_trait;
 //!

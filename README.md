@@ -1,4 +1,4 @@
-# authority 🦀
+# discord-authority 🦀
 
 A fast, async Discord selfbot library written in Rust.
 
@@ -19,20 +19,20 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authority = { git = "https://github.com/ege0x77czz/authority" }
+discord-authority = { git = "https://github.com/ege0x77czz/discord-authority" }
 ```
 
 Or if working locally:
 
 ```toml
 [dependencies]
-authority = { path = "." }
+discord-authority = { path = "." }
 ```
 
 ## Quick Start
 
 ```rust
-use authority::{ClientBuilder, EventHandler, Message, User};
+use discord_authority::{ClientBuilder, EventHandler, Message, User};
 use std::sync::Arc;
 use async_trait::async_trait;
 
@@ -80,7 +80,7 @@ client.send_dm(user_id, "hey").await?;
 ### Send an embed
 
 ```rust
-use authority::Embed;
+use discord_authority::Embed;
 
 let embed = Embed::new()
     .title("Check This Out")
@@ -151,7 +151,7 @@ println!("discord.gg/{}", invite.code);
 ### Polls
 
 ```rust
-use authority::{Poll, MessageBuilder};
+use discord_authority::{Poll, MessageBuilder};
 
 let poll = Poll::new("Favorite language?")
     .add_answer("Rust", Some("🦀".to_string()))
@@ -168,7 +168,7 @@ client.unvote_poll(channel_id, msg.id, 1).await?;
 ### Rich Presence
 
 ```rust
-use authority::RichPresence;
+use discord_authority::RichPresence;
 
 let presence = RichPresence::new("Minecraft")
     .details("Survival Mode")
@@ -176,7 +176,7 @@ let presence = RichPresence::new("Minecraft")
     .large_image("minecraft_icon")
     .large_text("1.20")
     .party(2, 10)
-    .start_timestamp(authority::utils::now())
+    .start_timestamp(discord_authority::utils::now())
     .add_button("Join", "https://example.com/join")
     .to_activity();
 
@@ -186,7 +186,7 @@ client.set_activity(presence).await?;
 ### Custom Status
 
 ```rust
-use authority::CustomStatus;
+use discord_authority::CustomStatus;
 
 let status = CustomStatus::new()
     .emoji("🔥")
@@ -339,7 +339,7 @@ Your crate will then be installable as:
 
 ```toml
 [dependencies]
-authority = "0.1"
+discord-authority = "0.1"
 ```
 
 ## Getting Your Token

@@ -1,11 +1,11 @@
 [package]
-name = "authority"
+name = "discord-authority"
 version = "0.1.0"
 edition = "2021"
 authors = ["ege0x77czz"]
 description = "A fast, async Discord selfbot library for Rust"
 license = "MIT"
-repository = "https://github.com/ege0x77czz/authority"
+repository = "https://github.com/ege0x77czz/discord-authority"
 keywords = ["discord", "selfbot", "api", "client", "async"]
 categories = ["api-bindings", "asynchronous"]
 readme = "README.md"
