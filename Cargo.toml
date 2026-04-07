@@ -1,6 +1,6 @@
 [package]
 name = "discord-authority"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["ege0x77czz"]
 description = "A fast, async Discord selfbot library for Rust"
