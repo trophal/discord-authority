@@ -1,6 +1,6 @@
-//! # Discord Selfbot
+//! # authority
 //!
-//! An unofficial Discord API library for user accounts (selfbots) in Rust.
+//! A fast, async Discord selfbot library for Rust.
 //!
 //! ## Warning
 //! Using selfbots is against Discord's Terms of Service and can result in account termination.
@@ -8,7 +8,7 @@
 //!
 //! ## Example
 //! ```no_run
-//! use discord_selfbot::{Client, ClientBuilder, EventHandler, User};
+//! use authority::{Client, ClientBuilder, EventHandler, User};
 //! use std::sync::Arc;
 //! use async_trait::async_trait;
 //!
@@ -16,7 +16,7 @@
 //!
 //! #[async_trait]
 //! impl EventHandler for MyHandler {
-//!     async fn ready(&self, user: User) {
+//!     async fn on_ready(&self, user: User) {
 //!         println!("{} is ready!", user.username);
 //!     }
 //! }

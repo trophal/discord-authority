@@ -1,47 +1,38 @@
-# Discord Selfbot - Rust 🦀
+# authority 🦀
 
-A powerful Discord selfbot library written in Rust. Fast, safe, and easy to use.
+A fast, async Discord selfbot library written in Rust.
 
-> ⚠️ **HEADS UP**: Using selfbots violates Discord's ToS and can get your account banned. Use at your own risk!
-
-## What's This?
-
-This is a Rust library that lets you control your Discord account programmatically. Think of it as discord.js but for selfbots and written in Rust. It's blazingly fast thanks to Rust's performance and has a clean API that won't make you cry.
+> ⚠️ **Heads up**: Using selfbots violates Discord's ToS and can get your account banned. Use at your own risk.
 
 ## Features
 
-- ✅ **WebSocket Gateway** - Real-time events, just works
-- ✅ **REST API** - Everything you need from Discord's API
-- ✅ **Rich Presence** - Flex with custom activities
-- ✅ **Custom Status** - Show off what you're doing
-- ✅ **Spotify RPC** - Fake or real, your choice
-- ✅ **Embeds** - Pretty messages that stand out
-- ✅ **Polls** - Create and vote on polls
-- ✅ **Async/Await** - Powered by Tokio
-- ✅ **Type Safe** - Rust's got your back
+- WebSocket gateway with real-time events
+- Full REST API coverage (messages, reactions, guilds, members, roles, bans, invites, polls, DMs)
+- Rich Presence, Spotify RPC, and custom status
+- Embeds and polls with builder APIs
+- Async/await powered by Tokio
+- Clean `on_*` event handler naming
 
-## Getting Started
+## Installation
 
-Add this to your `Cargo.toml`:
+Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-discord-selfbot = { path = "." }
+authority = { git = "https://github.com/ege0x77czz/authority" }
 ```
 
-Or if you're working locally:
+Or if working locally:
 
 ```toml
 [dependencies]
-discord-selfbot = { git = "https://github.com/ege0x77czz/rust-discord-selfbot" }
+authority = { path = "." }
 ```
 
-## Quick Examples
-
-### Basic Setup
+## Quick Start
 
 ```rust
-use discord_selfbot::{Client, ClientBuilder, EventHandler, Message, User};
+use authority::{ClientBuilder, EventHandler, Message, User};
 use std::sync::Arc;
 use async_trait::async_trait;
 
@@ -49,20 +40,20 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, user: User) {
+    async fn on_ready(&self, user: User) {
         println!("{} is ready!", user.username);
     }
 
-    async fn message_create(&self, message: Message) {
+    async fn on_message(&self, message: Message) {
         if message.content == "ping" {
-            println!("Got ping from {}", message.author.username);
+            println!("pong from {}", message.author.username);
         }
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = ClientBuilder::new("YOUR_TOKEN_HERE")
+    let client = ClientBuilder::new("YOUR_TOKEN")
         .event_handler(Arc::new(Handler))
         .build()
         .await?;
@@ -72,47 +63,121 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Send a Message
+## Examples
+
+### Send a message
 
 ```rust
-let channel_id = "123456789".into();
 client.send_message(channel_id, "yo what's up").await?;
 ```
 
-### Send an Embed
+### Send a DM
 
 ```rust
-use discord_selfbot::{Embed, MessageBuilder};
+client.send_dm(user_id, "hey").await?;
+```
+
+### Send an embed
+
+```rust
+use authority::Embed;
 
 let embed = Embed::new()
     .title("Check This Out")
     .description("Pretty cool right?")
     .color(0xFF0000)
     .field("Field 1", "Value 1", true)
-    .footer("Made with Rust")
-    .image("https://example.com/image.png");
+    .footer("Made with authority");
 
-let payload = MessageBuilder::new()
-    .content("Look at this embed:")
-    .embed(embed)
-    .build();
-
-client.send_message_advanced(channel_id, payload).await?;
+client.send_embed(channel_id, embed).await?;
 ```
 
-### Rich Presence (Flex Mode)
+### Message history
 
 ```rust
-use discord_selfbot::RichPresence;
+let messages = client.get_messages(channel_id, 50, None, None).await?;
+```
+
+### Reactions
+
+```rust
+client.add_reaction(channel_id, message_id, "👍").await?;
+client.remove_reaction(channel_id, message_id, "👍").await?;
+client.clear_reactions(channel_id, message_id).await?;
+```
+
+### Pin / unpin
+
+```rust
+client.pin_message(channel_id, message_id).await?;
+client.unpin_message(channel_id, message_id).await?;
+```
+
+### Bulk delete
+
+```rust
+client.bulk_delete_messages(channel_id, vec![id1, id2, id3]).await?;
+```
+
+### Guild management
+
+```rust
+// Members
+let member = client.get_member(guild_id, user_id).await?;
+client.kick_member(guild_id, user_id).await?;
+client.ban_member(guild_id, user_id, 0, Some("spamming")).await?;
+client.unban_member(guild_id, user_id).await?;
+let bans = client.get_bans(guild_id).await?;
+
+// Roles
+client.add_role(guild_id, user_id, role_id).await?;
+client.remove_role(guild_id, user_id, role_id).await?;
+let roles = client.get_roles(guild_id).await?;
+
+// Nickname
+client.set_nickname(guild_id, user_id, Some("cool nick")).await?;
+
+// Leave
+client.leave_guild(guild_id).await?;
+```
+
+### Invites
+
+```rust
+let invite = client.create_invite(channel_id, 86400, 0, false).await?;
+println!("discord.gg/{}", invite.code);
+```
+
+### Polls
+
+```rust
+use authority::{Poll, MessageBuilder};
+
+let poll = Poll::new("Favorite language?")
+    .add_answer("Rust", Some("🦀".to_string()))
+    .add_answer("Python", Some("🐍".to_string()))
+    .duration_hours(24)
+    .allow_multiselect(false);
+
+let msg = client.send(channel_id, MessageBuilder::new().poll(poll)).await?;
+
+client.vote_poll(channel_id, msg.id, 1).await?;
+client.unvote_poll(channel_id, msg.id, 1).await?;
+```
+
+### Rich Presence
+
+```rust
+use authority::RichPresence;
 
 let presence = RichPresence::new("Minecraft")
-    .state("Building stuff")
     .details("Survival Mode")
+    .state("Building stuff")
     .large_image("minecraft_icon")
-    .large_text("Version 1.20")
+    .large_text("1.20")
     .party(2, 10)
-    .start_timestamp(discord_selfbot::utils::now())
-    .add_button("Join Me", "https://example.com/join")
+    .start_timestamp(authority::utils::now())
+    .add_button("Join", "https://example.com/join")
     .to_activity();
 
 client.set_activity(presence).await?;
@@ -121,7 +186,7 @@ client.set_activity(presence).await?;
 ### Custom Status
 
 ```rust
-use discord_selfbot::CustomStatus;
+use authority::CustomStatus;
 
 let status = CustomStatus::new()
     .emoji("🔥")
@@ -129,48 +194,157 @@ let status = CustomStatus::new()
     .to_activity();
 
 client.set_activity(status).await?;
+client.clear_activity().await?;
 ```
 
-### Create a Poll
+### Message helpers
 
 ```rust
-use discord_selfbot::{Poll, MessageBuilder};
-
-let poll = Poll::new("What's your favorite language?")
-    .add_answer("Rust", Some("🦀".to_string()))
-    .add_answer("Python", Some("🐍".to_string()))
-    .add_answer("JavaScript", Some("💩".to_string()))
-    .duration_hours(24)
-    .allow_multiselect(false);
-
-let payload = MessageBuilder::new().poll(poll).build();
-let message = client.send_message_advanced(channel_id, payload).await?;
-
-// Vote for Rust obviously
-client.vote_poll(channel_id, message.id, 1).await?;
+message.reply(&client.http, "sup").await?;
+message.reply_embed(&client.http, embed).await?;
+message.react(&client.http, "👍").await?;
+message.edit(&client.http, "fixed typo").await?;
+message.pin(&client.http).await?;
+message.delete(&client.http).await?;
 ```
 
-## Examples
+## All Events
 
-Check out the `examples/` folder for more:
+```rust
+#[async_trait]
+impl EventHandler for Handler {
+    // Connection
+    async fn on_ready(&self, user: User) {}
+    async fn on_resumed(&self) {}
 
-- `basic.rs` - Simple bot to get started
-- `embed.rs` - Sending fancy embeds
-- `rich_presence.rs` - Show off with Rich Presence
-- `poll.rs` - Polls and voting
+    // Messages
+    async fn on_message(&self, message: Message) {}
+    async fn on_message_edit(&self, old: Option<Message>, new: Message) {}
+    async fn on_message_delete(&self, channel_id: Snowflake, message_id: Snowflake) {}
+    async fn on_message_bulk_delete(&self, channel_id: Snowflake, message_ids: Vec<Snowflake>) {}
 
-Run them like this:
+    // Reactions
+    async fn on_reaction_add(&self, reaction: ReactionEvent) {}
+    async fn on_reaction_remove(&self, reaction: ReactionEvent) {}
+    async fn on_reaction_clear(&self, channel_id: Snowflake, message_id: Snowflake) {}
+    async fn on_reaction_clear_emoji(&self, channel_id: Snowflake, message_id: Snowflake, emoji: String) {}
 
-```bash
-cargo run --example basic
-cargo run --example rich_presence
+    // Guilds
+    async fn on_guild_join(&self, guild: Guild) {}
+    async fn on_guild_update(&self, old: Option<Guild>, new: Guild) {}
+    async fn on_guild_leave(&self, guild_id: Snowflake) {}
+    async fn on_guild_unavailable(&self, guild_id: Snowflake) {}
+
+    // Members
+    async fn on_member_join(&self, guild_id: Snowflake, member: GuildMember) {}
+    async fn on_member_update(&self, guild_id: Snowflake, member: GuildMember) {}
+    async fn on_member_leave(&self, guild_id: Snowflake, user: User) {}
+
+    // Roles
+    async fn on_role_create(&self, guild_id: Snowflake, role: Role) {}
+    async fn on_role_update(&self, guild_id: Snowflake, role: Role) {}
+    async fn on_role_delete(&self, guild_id: Snowflake, role_id: Snowflake) {}
+
+    // Channels
+    async fn on_channel_create(&self, channel: Channel) {}
+    async fn on_channel_update(&self, old: Option<Channel>, new: Channel) {}
+    async fn on_channel_delete(&self, channel: Channel) {}
+    async fn on_channel_pins_update(&self, channel_id: Snowflake, last_pin_timestamp: Option<String>) {}
+
+    // Threads
+    async fn on_thread_create(&self, channel: Channel) {}
+    async fn on_thread_update(&self, channel: Channel) {}
+    async fn on_thread_delete(&self, channel_id: Snowflake, guild_id: Option<Snowflake>) {}
+
+    // Invites
+    async fn on_invite_create(&self, invite: Invite) {}
+    async fn on_invite_delete(&self, channel_id: Snowflake, code: String) {}
+
+    // Bans
+    async fn on_ban_add(&self, guild_id: Snowflake, user: User) {}
+    async fn on_ban_remove(&self, guild_id: Snowflake, user: User) {}
+
+    // Presence & Typing
+    async fn on_presence_update(&self, presence: Presence) {}
+    async fn on_typing_start(&self, channel_id: Snowflake, user_id: Snowflake) {}
+
+    // Polls
+    async fn on_poll_vote_add(&self, user_id: Snowflake, channel_id: Snowflake, message_id: Snowflake, answer_id: u32) {}
+    async fn on_poll_vote_remove(&self, user_id: Snowflake, channel_id: Snowflake, message_id: Snowflake, answer_id: u32) {}
+
+    // Users
+    async fn on_user_update(&self, user: User) {}
+
+    // Raw
+    async fn on_raw_event(&self, event: serde_json::Value) {}
+}
 ```
 
-**Note:** Don't forget to replace `"token"` with your actual Discord token in the code!
+## All Client Methods
+
+| Method | Description |
+|--------|-------------|
+| `send_message(channel_id, content)` | Send a plain text message |
+| `send(channel_id, builder)` | Send via `MessageBuilder` |
+| `send_embed(channel_id, embed)` | Send an embed |
+| `send_message_with_embed(channel_id, content, embed)` | Send content + embed |
+| `send_dm(user_id, content)` | Open DM and send a message |
+| `edit_message(channel_id, message_id, content)` | Edit a message |
+| `delete_message(channel_id, message_id)` | Delete a message |
+| `bulk_delete_messages(channel_id, ids)` | Bulk delete messages |
+| `get_message(channel_id, message_id)` | Fetch a message |
+| `get_messages(channel_id, limit, before, after)` | Fetch message history |
+| `pin_message(channel_id, message_id)` | Pin a message |
+| `unpin_message(channel_id, message_id)` | Unpin a message |
+| `get_pinned_messages(channel_id)` | Fetch pinned messages |
+| `add_reaction(channel_id, message_id, emoji)` | Add a reaction |
+| `remove_reaction(channel_id, message_id, emoji)` | Remove your reaction |
+| `clear_reactions(channel_id, message_id)` | Clear all reactions |
+| `get_channel(channel_id)` | Fetch a channel |
+| `create_dm(user_id)` | Open a DM channel |
+| `start_typing(channel_id)` | Show typing indicator |
+| `create_invite(channel_id, max_age, max_uses, temporary)` | Create an invite |
+| `vote_poll(channel_id, message_id, answer_id)` | Vote on a poll |
+| `unvote_poll(channel_id, message_id, answer_id)` | Remove poll vote |
+| `get_guild(guild_id)` | Fetch a guild |
+| `get_my_guilds()` | Fetch all your guilds |
+| `leave_guild(guild_id)` | Leave a guild |
+| `get_member(guild_id, user_id)` | Fetch a guild member |
+| `kick_member(guild_id, user_id)` | Kick a member |
+| `ban_member(guild_id, user_id, delete_secs, reason)` | Ban a member |
+| `unban_member(guild_id, user_id)` | Unban a user |
+| `get_bans(guild_id)` | Fetch ban list |
+| `add_role(guild_id, user_id, role_id)` | Add role to member |
+| `remove_role(guild_id, user_id, role_id)` | Remove role from member |
+| `set_nickname(guild_id, user_id, nick)` | Set member nickname |
+| `get_roles(guild_id)` | Fetch all roles |
+| `delete_role(guild_id, role_id)` | Delete a role |
+| `get_user(user_id)` | Fetch a user |
+| `set_presence(activities, status)` | Set full presence |
+| `set_activity(activity)` | Set a single activity |
+| `set_status(status)` | Set status only |
+| `clear_activity()` | Clear all activities |
+| `current_user()` | Get cached current user |
+| `fetch_me()` | Fetch current user from API |
+| `listen()` | Start the event loop |
+
+## Publishing to crates.io
+
+1. Make sure you have a [crates.io](https://crates.io) account and have run `cargo login`
+2. Double-check `Cargo.toml` — name, version, description, license, repository
+3. Run `cargo publish --dry-run` to catch any issues before publishing
+4. Run `cargo publish` to push it live
+
+Your crate will then be installable as:
+
+```toml
+[dependencies]
+authority = "0.1"
+```
 
 ## Getting Your Token
 
-Open Discord, press `Ctrl + Shift + I` to open DevTools, go to Console, and paste this:
+Open Discord in the browser or desktop app, press `Ctrl + Shift + I`, go to Console, and paste:
 
 ```javascript
 window.webpackChunkdiscord_app.push([
@@ -183,87 +357,25 @@ window.webpackChunkdiscord_app.push([
                 if (!m.exports || m.exports === window) continue;
                 if (m.exports?.getToken) return copy(m.exports.getToken());
                 for (let ex in m.exports) {
-                    if (m.exports?.[ex]?.getToken && m.exports[ex][Symbol.toStringTag] !== 'IntlMessagesProxy') 
+                    if (m.exports?.[ex]?.getToken && m.exports[ex][Symbol.toStringTag] !== 'IntlMessagesProxy')
                         return copy(m.exports[ex].getToken());
                 }
             } catch {}
         }
     },
 ]);
-
 window.webpackChunkdiscord_app.pop();
 ```
 
-Your token will be copied to clipboard. **Keep it secret!**
-
-## All Events
-
-Here's everything you can listen to:
-
-```rust
-#[async_trait]
-impl EventHandler for Handler {
-    async fn ready(&self, user: User) {}
-    async fn message_create(&self, message: Message) {}
-    async fn message_update(&self, old: Option<Message>, new: Message) {}
-    async fn message_delete(&self, channel_id: Snowflake, message_id: Snowflake) {}
-    async fn guild_create(&self, guild: Guild) {}
-    async fn guild_delete(&self, guild_id: Snowflake) {}
-    async fn channel_create(&self, channel: Channel) {}
-    async fn channel_delete(&self, channel: Channel) {}
-    async fn presence_update(&self, presence: Presence) {}
-    async fn typing_start(&self, channel_id: Snowflake, user_id: Snowflake) {}
-    async fn poll_vote_add(&self, user_id: Snowflake, channel_id: Snowflake, message_id: Snowflake, answer_id: u32) {}
-    async fn poll_vote_remove(&self, user_id: Snowflake, channel_id: Snowflake, message_id: Snowflake, answer_id: u32) {}
-    async fn raw(&self, event: serde_json::Value) {}
-}
-```
-
-## What You Can Do
-
-### Client Methods
-
-- `send_message(channel_id, content)` - Send a quick message
-- `send_message_advanced(channel_id, payload)` - Send message with embeds, polls, etc.
-- `edit_message(channel_id, message_id, content)` - Edit your messages
-- `delete_message(channel_id, message_id)` - Delete messages
-- `get_message(channel_id, message_id)` - Fetch a message
-- `add_reaction(channel_id, message_id, emoji)` - React to messages
-- `remove_reaction(channel_id, message_id, emoji)` - Remove reactions
-- `vote_poll(channel_id, message_id, answer_id)` - Vote on polls
-- `typing(channel_id)` - Show typing indicator
-- `set_presence(activities, status)` - Set your presence
-- `set_activity(activity)` - Set a single activity
-- `set_status(status)` - Just change your status
-
-### Message Helpers
-
-```rust
-message.reply(http, "sup").await?;
-message.react(http, "👍").await?;
-message.delete(http).await?;
-message.edit(http, "fixed typo").await?;
-```
+Your token is now in your clipboard. Keep it secret.
 
 ## Requirements
 
-- Rust 1.70+ (probably works on older versions too but haven't tested)
+- Rust 1.70+
 - Tokio runtime
 
-## Contributing
+## License
 
-Found a bug? Want to add something cool? PRs are welcome! Just open an issue first if it's something big.
+MIT — do whatever you want with it.
 
-## Legal Stuff
-
-This is for educational purposes. Using selfbots is against Discord's Terms of Service. Your account might get banned. We're not responsible if that happens. You've been warned! ⚠️
-
-Also, this project is licensed under MIT. Do whatever you want with it.
-
-## Need Help?
-
-Open an issue on GitHub if you're stuck or something's broken.
-
----
-
-**Remember:** This breaks Discord's ToS. Use responsibly (or don't get caught 😉)
+> This project is for educational purposes. Selfbots violate Discord's ToS. You've been warned. ⚠️
